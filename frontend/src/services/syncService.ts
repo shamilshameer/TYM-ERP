@@ -8,16 +8,17 @@ import { conflictResolver } from './sync/conflictResolver';
 import { mergeUtils } from './sync/mergeUtils';
 import { calculateBackoff } from '../utils/backoffCalculator';
 
+// @ts-ignore
 const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const SYNC_INTERVAL = 30000;
 const INITIAL_BACKOFF = 2000;
 const MAX_BACKOFF = 60000;
 
 class SyncService {
-  private syncTimer: NodeJS.Timeout | null = null;
+  private syncTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private retryCount = 0;
-  private backoffTimeout: NodeJS.Timeout | null = null;
+  private backoffTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private getClientId(): string {
     let id = localStorage.getItem('syncerp_client_id');

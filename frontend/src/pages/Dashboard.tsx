@@ -5,7 +5,6 @@ import {
   Package, 
   AlertTriangle, 
   Send,
-  ArrowUpRight,
   RefreshCw,
   TrendingUp,
   PieChart as PieIcon
