@@ -1,0 +1,126 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Represents a retail product in the system
+model Product {
+  id              String      @id @default(uuid())
+  name            String
+  sku             String      @unique
+  category        String
+  price           Decimal     @db.Decimal(10, 2)
+  stockQty        Int
+  
+  // Auditing & Sync fields
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  clientUpdatedAt DateTime?   // Record when the change was made offline
+  deletedAt       DateTime?   // Null means active, timestamp means soft deleted
+  version         Int         @default(1) // For optimistic locking / conflict tracking
+  
+  saleItems       SaleItem[]
+
+  @@index([updatedAt])
+  @@index([deletedAt])
+  @@index([category])
+}
+
+/// Represents a customer in the system
+model Customer {
+  id              String      @id @default(uuid())
+  name            String
+  phone           String?
+  email           String?
+  address         String?
+  
+  // Auditing & Sync fields
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  clientUpdatedAt DateTime?
+  deletedAt       DateTime?
+  version         Int         @default(1)
+  
+  sales           Sale[]
+
+  @@index([updatedAt])
+  @@index([deletedAt])
+  @@index([phone])
+}
+
+/// Represents a completed sales transaction (Invoice)
+model Sale {
+  id              String      @id @default(uuid())
+  customerId      String?
+  customer        Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  saleDate        DateTime    @default(now())
+  
+  // Auditing & Sync fields
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  clientUpdatedAt DateTime?
+  deletedAt       DateTime?
+  version         Int         @default(1)
+  
+  items           SaleItem[]
+
+  @@index([customerId])
+  @@index([updatedAt])
+  @@index([deletedAt])
+  @@index([saleDate])
+}
+
+/// Represents a line item inside a Sale
+model SaleItem {
+  id              String      @id @default(uuid())
+  saleId          String
+  sale            Sale        @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  qty             Int
+  unitPrice       Decimal     @db.Decimal(10, 2)
+  totalPrice      Decimal     @db.Decimal(10, 2)
+  
+  // Auditing & Sync fields
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  clientUpdatedAt DateTime?
+  deletedAt       DateTime?
+
+  @@index([saleId])
+  @@index([productId])
+  @@index([updatedAt])
+}
+
+/// Backend Outbox events for asynchronous messaging or audit trails
+model OutboxEvent {
+  id            String    @id @default(uuid())
+  aggregateType String    // e.g. 'Product', 'Customer', 'Sale'
+  aggregateId   String    // ID of the target resource
+  eventType     String    // e.g. 'CREATE', 'UPDATE', 'DELETE'
+  payload       Json      // State changes payload
+  createdAt     DateTime  @default(now())
+  processed     Boolean   @default(false)
+  processedAt   DateTime?
+
+  @@index([processed])
+  @@index([createdAt])
+}
+
+/// Tracks synchronization metadata for each connected client
+model SyncMetadata {
+  id            String    @id @default(uuid())
+  clientId      String    @unique // Unique hardware/browser installation ID
+  clientName    String?   // Friendly name (e.g. "Register 1")
+  lastSyncedAt  DateTime  @default(now())
+  osVersion     String?
+  ipAddress     String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
